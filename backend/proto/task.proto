@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package taskify;
+
+// The Task message represents a task entity.
+message Task {
+    int64 taskId = 1;            // Unique identifier for the task
+    string description = 2;       // Detailed description of the task
+    int64 deadline = 3;           // Deadline timestamp for the task
+    string exitCriteria = 4;      // Exit criteria for completing the task
+    bool complete = 5;            // Status of task completion
+}
+
+// Request and Response messages
+message TaskRequest {
+    Task task = 1;  // The task to create or update
+}
+
+message TaskResponse {
+    Task task = 1;  // The task response after creation or update
+}
+
+message UpdateTaskResponse {
+    Task task = 1;  // Updated task response
+}
+
+message DeleteTaskResponse {
+    bool success = 1;  // Indicates if the task was successfully deleted
+}
+
+message ListTaskRequest {
+    // Optional filters or pagination options for task listing
+}
+
+message ListTaskResponse {
+    repeated Task tasks = 1;  // List of tasks returned
+}
+
+// The TaskService defines RPC methods for managing tasks
+service TaskService {
+    rpc CreateTask(TaskRequest) returns (TaskResponse);   // Create a new task
+    rpc UpdateTask(TaskRequest) returns (TaskResponse);   // Update an existing task
+    rpc DeleteTask(TaskRequest) returns (DeleteTaskResponse);  // Delete a task
+    rpc ListTask(ListTaskRequest) returns (ListTaskResponse);  // List all tasks
+}
