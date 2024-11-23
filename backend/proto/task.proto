@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package taskify;
 
+option go_package = "./backend/proto;taskify";  // Update this with the correct path
+
 // The Task message represents a task entity.
 message Task {
     int64 taskId = 1;            // Unique identifier for the task
