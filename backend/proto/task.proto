@@ -7,10 +7,11 @@ option go_package = "./backend/proto;taskify";  // Update this with the correct 
 // The Task message represents a task entity.
 message Task {
     int64 taskId = 1;            // Unique identifier for the task
-    string description = 2;       // Detailed description of the task
-    int64 deadline = 3;           // Deadline timestamp for the task
-    string exitCriteria = 4;      // Exit criteria for completing the task
-    bool complete = 5;            // Status of task completion
+    string title = 2;
+    string description = 3;       // Detailed description of the task
+    int64 deadline = 4;           // Deadline timestamp for the task
+    string exitCriteria = 5;      // Exit criteria for completing the task
+    bool complete = 6;            // Status of task completion
 }
 
 // Request and Response messages
