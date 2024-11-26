@@ -3,15 +3,18 @@ package main
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	pb "taskify/backend/proto"
 
 	"github.com/google/go-cmp/cmp"
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	"github.com/google/go-cmp/cmp/cmpopts" // Import cmpopts for IgnoreFields
+	_ "github.com/mattn/go-sqlite3"        // SQLite driver
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func initializeTestingDatabase(t *testing.T) *sql.DB {
@@ -38,7 +41,7 @@ func initializeTestingDatabase(t *testing.T) *sql.DB {
 func TestCreateTask(t *testing.T) {
 	ctx := context.Background()
 	db := initializeTestingDatabase(t)
-	testServer := &pb.server{
+	testServer := server{
 		db: db,
 	}
 
@@ -48,74 +51,119 @@ func TestCreateTask(t *testing.T) {
 		expectedError error
 	}{
 		{
-			Name: "happy_path",
-			Task: &pb.Task{
+			name: "happy_path",
+			task: &pb.Task{
 				Title:        "Test Task",
 				Description:  "This is the task",
-				Deadline:     time.Now().Unix(),
+				Deadline:     time.Now().Add(1 * time.Hour).Unix(),
 				ExitCriteria: "Finish it",
 				Complete:     false,
 			},
 		},
 		{
-			Name: "missing_description",
-			Task: &pb.Task{
+			name: "missing_description",
+			task: &pb.Task{
 				Title:        "Test Task",
-				Deadline:     time.Now().Unix(),
+				Description:  "",
+				Deadline:     time.Now().Add(1 * time.Hour).Unix(),
 				ExitCriteria: "Finish it",
 				Complete:     false,
 			},
-			expectedError: errors.New("Description was missing"),
+			expectedError: status.Error(codes.NotFound, "Description was missing"),
 		},
 		{
-			Name: "missing_title",
-			Task: &pb.Task{
+			name: "missing_title",
+			task: &pb.Task{
 				Description:  "This is the task",
-				Deadline:     time.Now().Unix(),
+				Deadline:     time.Now().Add(1 * time.Hour).Unix(),
 				ExitCriteria: "Finish it",
 				Complete:     false,
 			},
-			expectedError: errors.New("Title was missing"),
+			expectedError: status.Error(codes.NotFound, "Title was missing"),
 		},
 		{
-			Name: "missing_exit_criteria",
-			Task: &pb.Task{
+			name: "missing_exit_criteria",
+			task: &pb.Task{
 				Title:       "Test Task",
 				Description: "This is the task",
-				Deadline:    time.Now().Unix(),
+				Deadline:    time.Now().Add(1 * time.Hour).Unix(),
 				Complete:    false,
 			},
-			expectedError: errors.New("Exit Criteria was missing"),
+			expectedError: status.Error(codes.NotFound, "Exist Criteria was missing"),
 		},
 		{
-			Name: "deadline_passed",
-			Task: &pb.Task{
+			name: "missing_deadline",
+			task: &pb.Task{
+				Title:        "Test Task",
+				Description:  "This is the task",
+				ExitCriteria: "Finish it",
+				Complete:     false,
+			},
+			expectedError: status.Error(codes.NotFound, "Deadline was missing"),
+		},
+		{
+			name: "deadline_passed",
+			task: &pb.Task{
 				Title:        "Test Task",
 				Description:  "This is the task",
 				Deadline:     time.Now().Add(-24 * time.Hour).Unix(),
 				ExitCriteria: "Finish it",
 				Complete:     false,
 			},
-			expectedError: errors.New("Deadline already passed"),
+			expectedError: status.Error(codes.InvalidArgument, "Deadline must be in the future"),
 		},
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			req := &pb.TaskRequest{
-				Task: tc.task,
-			}
-			res, actualError := testServer.CreateTask(ctx, tc.task)
-			if actualError != nil {
-				if diff := cmp.Diff(tc.wantError, actualError); diff != "" {
-					t.Fatalf("The task couldn't be created %v", actualError)
+		t.Run(
+			tc.name,
+			func(t *testing.T) {
+				req := &pb.TaskRequest{
+					Task: tc.task,
 				}
+				res, actualError := testServer.CreateTask(ctx, req)
+				if actualError != nil {
+					if diff := cmp.Diff(tc.expectedError, actualError, cmpopts.EquateErrors()); diff != "" {
+						t.Fatalf("The task couldn't be created %v", actualError)
+					}
 
-			}
-			if diff := cmp.Diff(req, res, cmp.IgnoreFields(pb.TaskRequest{}, "Deadline")); diff != "" {
-				t.Errorf("Task could not be created (+want,-got) %v", diff)
-			}
-		})
+				} else {
+					if diff := cmp.Diff(req.Task, res.Task, cmpopts.IgnoreFields(pb.Task{}, "TaskId", "Deadline"), cmpopts.IgnoreUnexported(pb.Task{})); diff != "" {
+						t.Errorf("Task could not be created (+want,-got) %v", diff)
+					}
+				}
+			},
+		)
 
 	}
+}
+
+func TestCreateTask_DuplicateTask(t *testing.T) {
+	ctx := context.Background()
+
+	db := initializeTestingDatabase(t)
+	testServer := server{
+		db: db,
+	}
+
+	req := &pb.TaskRequest{
+		Task: &pb.Task{
+			Title:        "Test Task",
+			Description:  "This is the task",
+			Deadline:     time.Now().Add(1 * time.Hour).Unix(),
+			ExitCriteria: "Finish it",
+			Complete:     false,
+		},
+	}
+
+	_, err := testServer.CreateTask(ctx, req) // Storing the task for the first time
+	if err != nil {
+		t.Fatalf("The task could not be created %v", err)
+	}
+
+	_, err = testServer.CreateTask(ctx, req) // Trying to store the task for a second time
+	if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		t.Fatalf("There's a bigger issue trying to create a task in the DB %v", err)
+	}
+
 }

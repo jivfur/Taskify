@@ -160,6 +160,11 @@ type TaskResponse struct {
 	Task *Task `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"` // The task response after creation or update
 }
 
+// Error implements error.
+func (x *TaskResponse) Error() string {
+	panic("unimplemented")
+}
+
 func (x *TaskResponse) Reset() {
 	*x = TaskResponse{}
 	mi := &file_backend_proto_task_proto_msgTypes[2]
