@@ -34,7 +34,7 @@ type TaskServiceClient interface {
 	CreateTask(ctx context.Context, in *TaskRequest, opts ...grpc.CallOption) (*TaskResponse, error)
 	UpdateTask(ctx context.Context, in *TaskRequest, opts ...grpc.CallOption) (*TaskResponse, error)
 	DeleteTask(ctx context.Context, in *TaskRequest, opts ...grpc.CallOption) (*DeleteTaskResponse, error)
-	ListTask(ctx context.Context, in *ListTaskRequest, opts ...grpc.CallOption) (*ListTaskResponse, error)
+	ListTask(ctx context.Context, in *TaskRequest, opts ...grpc.CallOption) (*ListTaskResponse, error)
 }
 
 type taskServiceClient struct {
@@ -75,7 +75,7 @@ func (c *taskServiceClient) DeleteTask(ctx context.Context, in *TaskRequest, opt
 	return out, nil
 }
 
-func (c *taskServiceClient) ListTask(ctx context.Context, in *ListTaskRequest, opts ...grpc.CallOption) (*ListTaskResponse, error) {
+func (c *taskServiceClient) ListTask(ctx context.Context, in *TaskRequest, opts ...grpc.CallOption) (*ListTaskResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListTaskResponse)
 	err := c.cc.Invoke(ctx, TaskService_ListTask_FullMethodName, in, out, cOpts...)
@@ -94,7 +94,7 @@ type TaskServiceServer interface {
 	CreateTask(context.Context, *TaskRequest) (*TaskResponse, error)
 	UpdateTask(context.Context, *TaskRequest) (*TaskResponse, error)
 	DeleteTask(context.Context, *TaskRequest) (*DeleteTaskResponse, error)
-	ListTask(context.Context, *ListTaskRequest) (*ListTaskResponse, error)
+	ListTask(context.Context, *TaskRequest) (*ListTaskResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -114,7 +114,7 @@ func (UnimplementedTaskServiceServer) UpdateTask(context.Context, *TaskRequest) 
 func (UnimplementedTaskServiceServer) DeleteTask(context.Context, *TaskRequest) (*DeleteTaskResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteTask not implemented")
 }
-func (UnimplementedTaskServiceServer) ListTask(context.Context, *ListTaskRequest) (*ListTaskResponse, error) {
+func (UnimplementedTaskServiceServer) ListTask(context.Context, *TaskRequest) (*ListTaskResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListTask not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
@@ -193,7 +193,7 @@ func _TaskService_DeleteTask_Handler(srv interface{}, ctx context.Context, dec f
 }
 
 func _TaskService_ListTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListTaskRequest)
+	in := new(TaskRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func _TaskService_ListTask_Handler(srv interface{}, ctx context.Context, dec fun
 		FullMethod: TaskService_ListTask_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TaskServiceServer).ListTask(ctx, req.(*ListTaskRequest))
+		return srv.(TaskServiceServer).ListTask(ctx, req.(*TaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

@@ -31,9 +31,6 @@ message DeleteTaskResponse {
     bool success = 1;  // Indicates if the task was successfully deleted
 }
 
-message ListTaskRequest {
-    // Optional filters or pagination options for task listing
-}
 
 message ListTaskResponse {
     repeated Task tasks = 1;  // List of tasks returned
@@ -44,5 +41,5 @@ service TaskService {
     rpc CreateTask(TaskRequest) returns (TaskResponse);   // Create a new task
     rpc UpdateTask(TaskRequest) returns (TaskResponse);   // Update an existing task
     rpc DeleteTask(TaskRequest) returns (DeleteTaskResponse);  // Delete a task
-    rpc ListTask(ListTaskRequest) returns (ListTaskResponse);  // List all tasks
+    rpc ListTask(TaskRequest) returns (ListTaskResponse);  // List all tasks
 }

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/grpc" // gRPC package
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -60,7 +62,7 @@ func (s *server) validateTask(ctx context.Context, task *pb.Task) error {
 	}
 
 	if len(strings.TrimSpace(task.ExitCriteria)) == 0 {
-		return status.Error(codes.NotFound, "Exist Criteria was missing")
+		return status.Error(codes.NotFound, "Exit Criteria was missing")
 	}
 
 	if task.Deadline == 0 {
@@ -134,17 +136,156 @@ func (s *server) CreateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskRe
 
 // Updatetask will store update the TaskRequest in the Database
 func (s *server) UpdateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "UpdateTask method is not implemented yet")
+	err := s.validateTask(ctx, in.Task)
+	if err != nil {
+		return nil, err
+	}
+
+	task, err := s.GetTask(ctx, in.Task.TaskId)
+	if err != nil {
+		return nil, fmt.Errorf("retrieving the task: %v", err)
+	}
+
+	if diff := cmp.Diff(in.Task, task, cmpopts.IgnoreUnexported(pb.Task{})); diff == "" {
+		return nil, status.Error(codes.AlreadyExists, "no changes made")
+	}
+
+	query := "UPDATE tasks SET title = ?, description = ?, deadline = ?, exitCriteria = ?, complete = ? WHERE taskId = ?;"
+
+	res, err := s.db.Exec(query, in.Task.Title, in.Task.Description, in.Task.Deadline, in.Task.ExitCriteria, in.Task.Complete, in.Task.TaskId)
+	if err != nil {
+		return nil, err
+	}
+	lastAffectedRow, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	task, err = s.GetTask(ctx, lastAffectedRow)
+	if err != nil {
+		return nil, fmt.Errorf("retrieving the task: %v", err)
+	}
+
+	return &pb.TaskResponse{Task: task}, nil
 }
 
 // DeleteTask will delete the task from the database
 func (s *server) DeleteTask(ctx context.Context, in *pb.TaskRequest) (*pb.DeleteTaskResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "DeleteTask method is not implemented yet")
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "Task is nil")
+	}
+	if in.Task.TaskId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "TaskId is empty")
+	}
+
+	// Delete Query
+
+	query := `DELETE FROM tasks WHERE  taskId = ?`
+	res, err := s.db.Exec(query, in.Task.TaskId)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.DeleteTaskResponse{Success: rowsAffected == 1}, nil
 }
 
 // ListTask retrieves all the tasks, filtered by dates, status, etc.
-func (s *server) ListTask(ctx context.Context, in *pb.ListTaskRequest) (*pb.ListTaskResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "ListTask method is not implemented yet")
+func (s *server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
+	var whereClause []string
+	if len(strings.TrimSpace(in.Task.Title)) != 0 {
+		whereClause = append(whereClause, "title LIKE %"+strings.TrimSpace(in.Task.Title)+"%")
+	}
+	log
+	if len(strings.TrimSpace(in.Task.Description)) != 0 {
+		whereClause = append(whereClause, "description LIKE %"+strings.TrimSpace(in.Task.Description)+"%")
+	}
+
+	if len(strings.TrimSpace(in.Task.ExitCriteria)) != 0 {
+		whereClause = append(whereClause, "exitCriteria LIKE %"+strings.TrimSpace(in.Task.ExitCriteria)+"%")
+	}
+
+	if in.Task.Deadline != 0 {
+		whereClause = append(whereClause, "deadline = "+fmt.Sprintf("%d", in.Task.Deadline))
+	}
+
+	if in.Task.Complete {
+		whereClause = append(whereClause, "complete = 1")
+	}
+
+	query := "SELECT * FROM tasks "
+	if len(whereClause) > 0 {
+		query += "WHERE "
+	}
+	query = query + strings.Join(whereClause, " AND ") + " ORDER BY taskId ASC"
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to query tasks: %v", err))
+	}
+	defer rows.Close() // Ensure the rows are properly closed when done.
+
+	var tasks []*pb.Task
+	for rows.Next() {
+		var taskId int
+		var title, description, exitCriteria string
+		var deadline int64
+		var complete bool
+
+		// Adjust the scan parameters based on your database schema
+		if err := rows.Scan(&taskId, &title, &description, &deadline, &exitCriteria, &complete); err != nil {
+			log.Fatalf("Failed to scan row: %v", err)
+		}
+
+		tasks = append(tasks, &pb.Task{
+			TaskId:       int64(taskId),
+			Title:        title,
+			Description:  description,
+			ExitCriteria: exitCriteria,
+			Deadline:     deadline,
+			Complete:     complete,
+		})
+	}
+
+	return &pb.ListTaskResponse{Tasks: tasks}, nil
+}
+
+// Get Completed Tasks.
+func (s *server) CompletedTasks(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
+	rows, err := s.db.Query("SELECT * FROM tasks WHERE complete = 1")
+	if err != nil {
+		log.Fatalf("Failed to query tasks: %v", err)
+	}
+	defer rows.Close() // Ensure the rows are properly closed when done.
+
+	var completedTasks []*pb.Task
+	for rows.Next() {
+		var taskId int
+		var title, description, exitCriteria string
+		var deadline int64
+		var complete bool
+
+		// Adjust the scan parameters based on your database schema
+		if err := rows.Scan(&taskId, &title, &description, &deadline, &exitCriteria, &complete); err != nil {
+			log.Fatalf("Failed to scan row: %v", err)
+		}
+
+		completedTasks = append(completedTasks, &pb.Task{
+			TaskId:       int64(taskId),
+			Title:        title,
+			Description:  description,
+			ExitCriteria: exitCriteria,
+			Deadline:     deadline,
+			Complete:     complete,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Error encountered during iteration: %v", err))
+	}
+	return &pb.ListTaskResponse{Tasks: completedTasks}, nil
 }
 
 func main() {
