@@ -236,7 +236,7 @@ func (s *server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTask
 
 		// Adjust the scan parameters based on your database schema
 		if err := rows.Scan(&taskId, &title, &description, &deadline, &exitCriteria, &complete); err != nil {
-			log.Fatalf("Failed to scan row: %v", err)
+			return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to scan row: %v", err))
 		}
 
 		tasks = append(tasks, &pb.Task{
