@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"time"
 
 	server "taskify/backend/server"
 	validators "taskify/backend/validators"
@@ -15,29 +15,41 @@ import (
 func CreateTaskHandler(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	// Read the entire body content into a byte slice
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+	// Parse the form data
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
 		return
 	}
 
-	// Declare a TaskRequest struct to hold the decoded data
-	var taskReq pb.TaskRequest
-	// Decode the JSON into our taskReq struct
-	err = json.Unmarshal(body, &taskReq)
+	// Get the deadline string from the form input (assuming it's in a format like "2024-12-03T10:30")
+	deadlineStr := r.FormValue("deadline")
+
+	// Parse the deadline string into a time.Time object (adjust format as necessary)
+	deadline, err := time.Parse("2006-01-02T15:04", deadlineStr) // Adjust format if needed
 	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Invalid deadline format: %v", err), http.StatusBadRequest)
 		return
+	}
+
+	// Create a TaskRequest from the form data
+	taskReq := &pb.TaskRequest{
+		Task: &pb.Task{
+			Title:        r.FormValue("title"),
+			Description:  r.FormValue("description"),
+			ExitCriteria: r.FormValue("exitCriteria"),
+			Deadline:     deadline.Unix(),
+			Complete:     false,
+		},
 	}
 
 	// Validate the task
-	if err = validators.ValidateTask(taskReq.Task, false); err != nil {
+	if err := validators.ValidateTask(taskReq.Task, false); err != nil {
 		http.Error(w, fmt.Sprintf("Invalid Argument creating the task: %v", err), http.StatusBadRequest)
+		return
 	}
 
 	// Call the CreateTask method from the server struct
-	res, err := s.CreateTask(r.Context(), &taskReq)
+	res, err := s.CreateTask(r.Context(), taskReq)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -46,6 +58,6 @@ func CreateTaskHandler(s *server.Server, w http.ResponseWriter, r *http.Request)
 	// Return the response to the HTTP client
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(res.task)
+	json.NewEncoder(w).Encode(res.Task)
 
 }

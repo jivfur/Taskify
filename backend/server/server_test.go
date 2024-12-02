@@ -42,7 +42,7 @@ func TestCreateTask(t *testing.T) {
 	ctx := context.Background()
 	db := initializeTestingDatabase(t)
 	testServer := Server{
-		db: db,
+		Db: db,
 	}
 
 	testCases := []struct {
@@ -143,7 +143,7 @@ func TestCreateTask_DuplicateTask(t *testing.T) {
 
 	db := initializeTestingDatabase(t)
 	testServer := Server{
-		db: db,
+		Db: db,
 	}
 
 	req := &pb.TaskRequest{
@@ -173,7 +173,7 @@ func TestDeleteTask(t *testing.T) {
 
 	db := initializeTestingDatabase(t)
 	testServer := Server{
-		db: db,
+		Db: db,
 	}
 
 	taskReq := &pb.TaskRequest{
@@ -203,7 +203,7 @@ func TestDeleteTask_Task_Doesnt_Exist(t *testing.T) {
 
 	db := initializeTestingDatabase(t)
 	testServer := Server{
-		db: db,
+		Db: db,
 	}
 
 	req := &pb.TaskRequest{
@@ -234,7 +234,7 @@ func TestDeleteTask_Delete_Deleted_Task(t *testing.T) {
 
 	db := initializeTestingDatabase(t)
 	testServer := Server{
-		db: db,
+		Db: db,
 	}
 
 	taskReq := &pb.TaskRequest{
@@ -280,7 +280,7 @@ func TestDeleteTask_Empty_Task_Id(t *testing.T) {
 
 	db := initializeTestingDatabase(t)
 	testServer := Server{
-		db: db,
+		Db: db,
 	}
 
 	taskReq := &pb.TaskRequest{
@@ -431,7 +431,7 @@ func TestUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			db := initializeTestingDatabase(t)
 			testServer := Server{
-				db: db,
+				Db: db,
 			}
 			taskReq := &pb.TaskRequest{
 				Task: &pb.Task{Title: "Test Task", Description: "This is the task", Deadline: time.Now().Add(1 * time.Hour).Unix(), ExitCriteria: "Finish it", Complete: false},
@@ -462,7 +462,7 @@ func TestUpdate(t *testing.T) {
 func TestListTask(t *testing.T) {
 	ctx := context.Background()
 	testServer := Server{
-		db: initializeTestingDatabase(t),
+		Db: initializeTestingDatabase(t),
 	}
 
 	task := &pb.TaskRequest{

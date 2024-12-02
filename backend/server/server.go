@@ -5,19 +5,15 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"net"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"google.golang.org/grpc" // gRPC package
+	"github.com/google/go-cmp/cmp/cmpopts" // gRPC package
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"taskify/backend/handlers"
 	pb "taskify/backend/proto" // Import your proto package (path should match where task.pb.go is located)
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
@@ -25,16 +21,21 @@ import (
 
 type Server struct {
 	pb.UnimplementedTaskServiceServer         // Embedding the Unimplemented service for forward compatibility
-	db                                *sql.DB // Database
+	Db                                *sql.DB // Database
 }
 
-func initializeDatabase() (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", "database/taskify.db") // Update the path if needed
+func InitializeDatabase() (*sql.DB, error) {
+	schemaFilePath := os.Getenv("SQL_SCHEMA_PATH")
+	if schemaFilePath == "" {
+		schemaFilePath = "../database/" // Default to local path if not set
+	}
+
+	db, err := sql.Open("sqlite3", schemaFilePath+"taskify.db") // Update the path if needed
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	schema, err := os.ReadFile("database/init.sql") // Read schema from init.sql
+	schema, err := os.ReadFile(schemaFilePath + "init.sql") // Read schema from init.sql
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema file: %w", err)
 	}
@@ -81,7 +82,7 @@ func (s *Server) validateTask(ctx context.Context, task *pb.Task) error {
 func (s *Server) GetTask(ctx context.Context, id int64) (*pb.Task, error) {
 	var taskId, deadline, complete int
 	var title, description, exitCriteria string
-	err := s.db.QueryRow("SELECT * FROM tasks WHERE taskId = ?", id).Scan(&taskId, &title, &description, &deadline, &exitCriteria, &complete)
+	err := s.Db.QueryRow("SELECT * FROM tasks WHERE taskId = ?", id).Scan(&taskId, &title, &description, &deadline, &exitCriteria, &complete)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, status.Errorf(codes.NotFound, "task %d not found %v", id, err)
@@ -116,7 +117,7 @@ func (s *Server) CreateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskRe
 
 	// Execute the insert query
 	task := in.Task
-	res, err := s.db.Exec(query, task.Title, task.Description, task.Deadline, task.ExitCriteria, task.Complete)
+	res, err := s.Db.Exec(query, task.Title, task.Description, task.Deadline, task.ExitCriteria, task.Complete)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +155,7 @@ func (s *Server) UpdateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskRe
 
 	query := "UPDATE tasks SET title = ?, description = ?, deadline = ?, exitCriteria = ?, complete = ? WHERE taskId = ?;"
 
-	res, err := s.db.Exec(query, in.Task.Title, in.Task.Description, in.Task.Deadline, in.Task.ExitCriteria, in.Task.Complete, in.Task.TaskId)
+	res, err := s.Db.Exec(query, in.Task.Title, in.Task.Description, in.Task.Deadline, in.Task.ExitCriteria, in.Task.Complete, in.Task.TaskId)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +183,7 @@ func (s *Server) DeleteTask(ctx context.Context, in *pb.TaskRequest) (*pb.Delete
 	// Delete Query
 
 	query := `DELETE FROM tasks WHERE  taskId = ?`
-	res, err := s.db.Exec(query, in.Task.TaskId)
+	res, err := s.Db.Exec(query, in.Task.TaskId)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +202,7 @@ func (s *Server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTask
 	if len(strings.TrimSpace(in.Task.Title)) != 0 {
 		whereClause = append(whereClause, "title LIKE %"+strings.TrimSpace(in.Task.Title)+"%")
 	}
-	log
+
 	if len(strings.TrimSpace(in.Task.Description)) != 0 {
 		whereClause = append(whereClause, "description LIKE %"+strings.TrimSpace(in.Task.Description)+"%")
 	}
@@ -223,7 +224,7 @@ func (s *Server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTask
 		query += "WHERE "
 	}
 	query = query + strings.Join(whereClause, " AND ") + " ORDER BY taskId ASC"
-	rows, err := s.db.Query(query)
+	rows, err := s.Db.Query(query)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to query tasks: %v", err))
 	}
@@ -256,7 +257,7 @@ func (s *Server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTask
 
 // Get Completed Tasks.
 func (s *Server) CompletedTasks(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
-	rows, err := s.db.Query("SELECT * FROM tasks WHERE complete = 1")
+	rows, err := s.Db.Query("SELECT * FROM tasks WHERE complete = 1")
 	if err != nil {
 		log.Fatalf("Failed to query tasks: %v", err)
 	}
@@ -288,34 +289,4 @@ func (s *Server) CompletedTasks(ctx context.Context, in *pb.TaskRequest) (*pb.Li
 		return nil, status.Error(codes.Internal, fmt.Sprintf("Error encountered during iteration: %v", err))
 	}
 	return &pb.ListTaskResponse{Tasks: completedTasks}, nil
-}
-
-func main() {
-	// Initialize the database
-	db, err := initializeDatabase()
-	if err != nil {
-		log.Fatalf("Database initialization failed: %v", err)
-	}
-	defer db.Close()
-	// Create a listener on TCP port
-	lis, err := net.Listen("tcp", ":50051")
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	// Create a new gRPC server
-	s := grpc.NewServer()
-
-	// Register the service
-	pb.RegisterTaskServiceServer(s, &Server{db: db})
-
-	http.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
-		handlers.CreateTaskHandler(s, w, r) // Pass server instance to the handler
-	})
-
-	// Start the server
-	fmt.Println("Server is running on port :50051")
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
 }
