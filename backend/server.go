@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -16,12 +17,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"taskify/backend/handlers"
 	pb "taskify/backend/proto" // Import your proto package (path should match where task.pb.go is located)
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
-type server struct {
+type Server struct {
 	pb.UnimplementedTaskServiceServer         // Embedding the Unimplemented service for forward compatibility
 	db                                *sql.DB // Database
 }
@@ -48,7 +50,7 @@ func initializeDatabase() (*sql.DB, error) {
 
 // Validate task is complete
 
-func (s *server) validateTask(ctx context.Context, task *pb.Task) error {
+func (s *Server) validateTask(ctx context.Context, task *pb.Task) error {
 	if len(strings.TrimSpace(task.Title)) == 0 {
 		return status.Error(codes.NotFound, "Title was missing")
 	}
@@ -76,7 +78,7 @@ func (s *server) validateTask(ctx context.Context, task *pb.Task) error {
 
 }
 
-func (s *server) GetTask(ctx context.Context, id int64) (*pb.Task, error) {
+func (s *Server) GetTask(ctx context.Context, id int64) (*pb.Task, error) {
 	var taskId, deadline, complete int
 	var title, description, exitCriteria string
 	err := s.db.QueryRow("SELECT * FROM tasks WHERE taskId = ?", id).Scan(&taskId, &title, &description, &deadline, &exitCriteria, &complete)
@@ -98,7 +100,7 @@ func (s *server) GetTask(ctx context.Context, id int64) (*pb.Task, error) {
 }
 
 // CreateTask will store the TaskRequest in the Database
-func (s *server) CreateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskResponse, error) {
+func (s *Server) CreateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskResponse, error) {
 	if in == nil {
 		return nil, status.Error(codes.NotFound, "task is nil")
 	}
@@ -135,7 +137,7 @@ func (s *server) CreateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskRe
 }
 
 // Updatetask will store update the TaskRequest in the Database
-func (s *server) UpdateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskResponse, error) {
+func (s *Server) UpdateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskResponse, error) {
 	err := s.validateTask(ctx, in.Task)
 	if err != nil {
 		return nil, err
@@ -169,7 +171,7 @@ func (s *server) UpdateTask(ctx context.Context, in *pb.TaskRequest) (*pb.TaskRe
 }
 
 // DeleteTask will delete the task from the database
-func (s *server) DeleteTask(ctx context.Context, in *pb.TaskRequest) (*pb.DeleteTaskResponse, error) {
+func (s *Server) DeleteTask(ctx context.Context, in *pb.TaskRequest) (*pb.DeleteTaskResponse, error) {
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "Task is nil")
 	}
@@ -194,7 +196,7 @@ func (s *server) DeleteTask(ctx context.Context, in *pb.TaskRequest) (*pb.Delete
 }
 
 // ListTask retrieves all the tasks, filtered by dates, status, etc.
-func (s *server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
+func (s *Server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
 	var whereClause []string
 	if len(strings.TrimSpace(in.Task.Title)) != 0 {
 		whereClause = append(whereClause, "title LIKE %"+strings.TrimSpace(in.Task.Title)+"%")
@@ -253,7 +255,7 @@ func (s *server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTask
 }
 
 // Get Completed Tasks.
-func (s *server) CompletedTasks(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
+func (s *Server) CompletedTasks(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
 	rows, err := s.db.Query("SELECT * FROM tasks WHERE complete = 1")
 	if err != nil {
 		log.Fatalf("Failed to query tasks: %v", err)
@@ -305,7 +307,11 @@ func main() {
 	s := grpc.NewServer()
 
 	// Register the service
-	pb.RegisterTaskServiceServer(s, &server{db: db})
+	pb.RegisterTaskServiceServer(s, &Server{db: db})
+
+	http.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
+		handlers.CreateTaskHandler(s, w, r) // Pass server instance to the handler
+	})
 
 	// Start the server
 	fmt.Println("Server is running on port :50051")

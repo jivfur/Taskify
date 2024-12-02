@@ -41,7 +41,7 @@ func initializeTestingDatabase(t *testing.T) *sql.DB {
 func TestCreateTask(t *testing.T) {
 	ctx := context.Background()
 	db := initializeTestingDatabase(t)
-	testServer := server{
+	testServer := Server{
 		db: db,
 	}
 
@@ -142,7 +142,7 @@ func TestCreateTask_DuplicateTask(t *testing.T) {
 	ctx := context.Background()
 
 	db := initializeTestingDatabase(t)
-	testServer := server{
+	testServer := Server{
 		db: db,
 	}
 
@@ -172,7 +172,7 @@ func TestDeleteTask(t *testing.T) {
 	ctx := context.Background()
 
 	db := initializeTestingDatabase(t)
-	testServer := server{
+	testServer := Server{
 		db: db,
 	}
 
@@ -202,7 +202,7 @@ func TestDeleteTask_Task_Doesnt_Exist(t *testing.T) {
 	ctx := context.Background()
 
 	db := initializeTestingDatabase(t)
-	testServer := server{
+	testServer := Server{
 		db: db,
 	}
 
@@ -233,7 +233,7 @@ func TestDeleteTask_Delete_Deleted_Task(t *testing.T) {
 	ctx := context.Background()
 
 	db := initializeTestingDatabase(t)
-	testServer := server{
+	testServer := Server{
 		db: db,
 	}
 
@@ -279,7 +279,7 @@ func TestDeleteTask_Empty_Task_Id(t *testing.T) {
 	ctx := context.Background()
 
 	db := initializeTestingDatabase(t)
-	testServer := server{
+	testServer := Server{
 		db: db,
 	}
 
@@ -430,7 +430,7 @@ func TestUpdate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			db := initializeTestingDatabase(t)
-			testServer := server{
+			testServer := Server{
 				db: db,
 			}
 			taskReq := &pb.TaskRequest{
@@ -461,7 +461,7 @@ func TestUpdate(t *testing.T) {
 
 func TestListTask(t *testing.T) {
 	ctx := context.Background()
-	testServer := server{
+	testServer := Server{
 		db: initializeTestingDatabase(t),
 	}
 

@@ -11,7 +11,7 @@ import (
 	pb "taskify/backend/proto"
 )
 
-func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
+func CreateTaskHandler(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	// Read the entire body content into a byte slice
@@ -35,10 +35,16 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid Argument creating the task: %v", err), http.StatusBadRequest)
 	}
 
-	taskReq := &pb.TaskRequest{
-		Task: task,
+	// Call the CreateTask method from the server struct
+	res, err := s.CreateTask(r.Context(), &taskReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	server := main.server
+	// Return the response to the HTTP client
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res.task)
 
 }
