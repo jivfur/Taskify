@@ -37,8 +37,14 @@ func main() {
 	http.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
 		handlers.CreateTaskHandler(srv, w, r) // Pass server instance to the handler
 	})
+	http.HandleFunc("/createTask", handlers.CreateTaskPageHandler)
 
-	http.HandleFunc("/listTasks.html", handlers.ListTasksHandler)
+	http.HandleFunc("/listTasks", func(w http.ResponseWriter, r *http.Request) {
+		handlers.ListTasksHandler(srv, w, r)
+	})
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RenderErrorPage(w, "Page not found.")
+	})
 
 	go func() {
 		fmt.Println("HTTP Server running on port 8080")

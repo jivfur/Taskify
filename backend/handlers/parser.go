@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ParseForm(r *http.Request) (*pb.Task, error) {
+func ParseForm(r *http.Request, isCreate bool) (*pb.Task, error) {
 	if err := r.ParseForm(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "Failed to parse form data")
 	}
@@ -19,9 +19,13 @@ func ParseForm(r *http.Request) (*pb.Task, error) {
 	deadlineStr := r.FormValue("deadline")
 
 	// Parse the deadline string into a time.Time object (adjust format as necessary)
-	deadline, err := time.Parse("2006-01-02T15:04", deadlineStr) // Adjust format if needed
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid deadline format: %v", err))
+	var deadline time.Time
+	if isCreate {
+		var err error
+		deadline, err = time.Parse("2006-01-02T15:04", deadlineStr) // Adjust format if needed
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid deadline format: %v", err))
+		}
 	}
 
 	complete := false

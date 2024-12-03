@@ -197,7 +197,7 @@ func (s *Server) DeleteTask(ctx context.Context, in *pb.TaskRequest) (*pb.Delete
 }
 
 // ListTask retrieves all the tasks, filtered by dates, status, etc.
-func (s *Server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
+func (s *Server) ListTasks(ctx context.Context, in *pb.TaskRequest) (*pb.ListTaskResponse, error) {
 	var whereClause []string
 	if len(strings.TrimSpace(in.Task.Title)) != 0 {
 		whereClause = append(whereClause, "title LIKE %"+strings.TrimSpace(in.Task.Title)+"%")
@@ -211,7 +211,7 @@ func (s *Server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTask
 		whereClause = append(whereClause, "exitCriteria LIKE %"+strings.TrimSpace(in.Task.ExitCriteria)+"%")
 	}
 
-	if in.Task.Deadline != 0 {
+	if in.Task.Deadline > 0 {
 		whereClause = append(whereClause, "deadline = "+fmt.Sprintf("%d", in.Task.Deadline))
 	}
 
@@ -251,7 +251,6 @@ func (s *Server) ListTask(ctx context.Context, in *pb.TaskRequest) (*pb.ListTask
 			Complete:     complete,
 		})
 	}
-
 	return &pb.ListTaskResponse{Tasks: tasks}, nil
 }
 
