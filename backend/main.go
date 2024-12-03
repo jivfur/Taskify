@@ -38,6 +38,8 @@ func main() {
 		handlers.CreateTaskHandler(srv, w, r) // Pass server instance to the handler
 	})
 
+	http.HandleFunc("/listTasks.html", handlers.ListTasksHandler)
+
 	go func() {
 		fmt.Println("HTTP Server running on port 8080")
 		if err := http.ListenAndServe(":8080", nil); err != nil {
