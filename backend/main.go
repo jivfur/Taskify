@@ -34,15 +34,22 @@ func main() {
 	// Register the service
 	pb.RegisterTaskServiceServer(grpcServer, srv)
 
-	http.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
-		handlers.CreateTaskHandler(srv, w, r) // Pass server instance to the handler
-	})
-	http.HandleFunc("/createTask", handlers.CreateTaskPageHandler)
+	r := mux.NewRouter()
 
-	http.HandleFunc("/listTasks", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
+		handlers.CreateTaskHandler(srv, w, r) // Pass server instance to the handler
+	}).Methods("POST")
+	r.HandleFunc("/createTask", handlers.CreateTaskPageHandler).Methods("GET")
+
+	r.HandleFunc("/listTasks", func(w http.ResponseWriter, r *http.Request) {
 		handlers.ListTasksHandler(srv, w, r)
-	})
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	}).Methods("GET")
+
+	r.HandleFunc("/deleteTask/{taskId}", func(w http.ResponseWriter, r *http.Request) {
+		handlers.DeleteTaskHandler(srv, w, r)
+	}).Methods("GET", "POST")
+
+	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlers.RenderErrorPage(w, "Page not found.")
 	})
 
