@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"taskify/backend/handlers"
 
+	"github.com/gorilla/mux"
 	"google.golang.org/grpc"
 
 	pb "taskify/backend/proto"

@@ -4,6 +4,7 @@ go 1.23.3
 
 require (
 	github.com/google/go-cmp v0.6.0
+	github.com/gorilla/mux v1.8.1
 	github.com/mattn/go-sqlite3 v1.14.24
 	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.2
